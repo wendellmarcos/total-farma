@@ -2,7 +2,7 @@
 
 @section('content')
 
-    <h1>Lista deMedicamentos</h1>
+    <h1>Lista de Medicamentos</h1>
 
     <table id="myTable">
         <thead>

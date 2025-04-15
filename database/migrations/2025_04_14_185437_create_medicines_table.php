@@ -12,14 +12,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('medicines', function (Blueprint $table) {
-            $table->id();
-        $table->string('name');
-        $table->string('description');
-        $table->decimal('price', 8, 2);
-        $table->string('manufacturer');
-        $table->date('expiration_date');
-        $table->integer('stock');
+        $table->id()->autoIncrement();
+        $table->unsignedBigInteger('categories_id');
+        
+        $table->string('name')->nullable();
+        $table->string('description')->nullable();
+        $table->decimal('price', 8, 2)->nullable();
+        $table->string('manufacturer')->nullable();
+        $table->date('expiration_date')->nullable();
+        $table->integer('stock')->nullable();
+        $table->boolean('active')->default(true);
+
+    
         $table->timestamps();
+
+        $table->foreign('categories_id')->references('id')->on('categories')->nullOnDelete();
         });
     }
 
