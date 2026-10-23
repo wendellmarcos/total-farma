@@ -61,7 +61,12 @@ jobs:
 
       - name: Dependências PHP
         run: |
-          cp .env.example .env
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            # Sem .env.example no repositório: ambiente mínimo de teste (SQLite em memória).
+            printf 'APP_ENV=testing\nAPP_KEY=\nDB_CONNECTION=sqlite\nDB_DATABASE=:memory:\n' > .env
+          fi
           composer install --no-interaction --no-progress --prefer-dist
 
       - name: Chave da aplicação
