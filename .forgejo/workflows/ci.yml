@@ -1,0 +1,76 @@
+# CI do total-farma (Laravel) no Forgejo do dell-srv.
+# O repositório não tinha CI ativo no GitHub; este é o primeiro, no runner do dell-srv.
+#
+# - checkout com git: o actions/checkout perde o subcaminho /forgejo/ do Forgejo do dell-srv.
+#   Cada job roda numa rede docker própria; o Forgejo é http://forgejo:3030
+#   (--add-host=forgejo:host-gateway no runner);
+# - PHP 8.4 da imagem oficial + Composer + Node 22: composer install, build do Vite e
+#   `php artisan test` (SQLite em memória do phpunit.xml).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  testes:
+    name: Composer, build e testes
+    runs-on: docker
+    container:
+      image: php:8.4-cli-bookworm
+    timeout-minutes: 30
+    steps:
+      - name: Ferramentas do sistema
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends git unzip curl ca-certificates >/dev/null
+      - name: Checkout
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          git init -q .
+          git remote add origin "${SERVER%/}/${REPO}.git"
+          for base in http://forgejo:3030 http://forgejo:3000 "${SERVER%/}"; do
+            git -c "http.extraHeader=Authorization: token ${TOKEN}" fetch -q --depth 50 "$base/${REPO}.git" "$REF" 2>/dev/null && break
+          done
+          git checkout -q "$SHA"
+
+      - name: Composer
+        run: |
+          curl -fsSL https://getcomposer.org/installer | php -- --quiet --install-dir=/usr/local/bin --filename=composer
+          composer --version
+
+      - name: Node 22
+        run: |
+          base=https://nodejs.org/dist/latest-v22.x
+          tarball=$(curl -fsSL "$base/SHASUMS256.txt" | grep -o 'node-v22[0-9.]*-linux-x64.tar.gz' | head -1)
+          curl -fsSL "$base/$tarball" | tar -xz -C /usr/local --strip-components=1
+          node --version
+
+      - name: Dependências PHP
+        run: |
+          cp .env.example .env
+          composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Chave da aplicação
+        run: php artisan key:generate
+
+      - name: Build do frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Testes
+        run: php artisan test
